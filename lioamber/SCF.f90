@@ -55,7 +55,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
                             write_final_convergence, write_ls_convergence, &
                             movieprint
    use fileio_data  , only: verbose
-   use basis_data   , only: kkinds, kkind, cools, cool, Nuc, nshell, M, MM, c_raw
+   use basis_data   , only: kkinds, kkind, cools, cool, Nuc, nshell, M, MM, c_raw, af, Md, Nucd,cd, ad
    use basis_subs, only: neighbour_list_2e
    use excited_data,  only: libint_recalc
    use excitedsubs ,  only: ExcProp
@@ -111,6 +111,13 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
    LIODBLE, allocatable :: tmpmat(:,:)
    LIODBLE  :: HL_gap = 10.0D0
 
+!------------------------------------------------------------------------------!
+! Auxiliary variables to print af elements
+  integer :: afindex
+  logical, save                :: first_call = .true.
+  LIODBLE, dimension (:), allocatable :: Hmat_vec_checkpoint,Fmat_vec_checkpoint
+  LIODBLE, dimension (:,:), allocatable :: Smat_checkpoint
+  LIODBLE  :: En_checkpoint
 !------------------------------------------------------------------------------!
 ! Energy contributions and convergence
 
@@ -240,6 +247,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
       call g2g_timer_sum_start('Nuclear attraction')
       call int1(En, Fmat_vec, Hmat_vec, Smat, d, r, Iz, natom, &
                 ntatom)
+      allocate(Hmat_vec_checkpoint(MM))
       call ECP_fock( MM, Hmat_vec )
 
 ! Other terms
@@ -386,9 +394,9 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
       write(*,*)
       write(*,'(A)') "Starting SCF cycles."
    endif
-
-   converged = .false.
-   call converger_init( M_f, OPEN )
+   
+   converged = .false.                                                                             
+   call converger_init( M_f, OPEN ) 
 
    do 999 while ( (.not. converged) .and. (niter <= nMax) )
       call g2g_timer_start('Total iter')
@@ -417,6 +425,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
       call g2g_timer_sum_start('Exchange-correlation Fock')
       Exc = 0.0D0
       call g2g_solve_groups(0,Exc,0)
+
       call g2g_timer_sum_pause('Exchange-correlation Fock')
 
       ! Test for NaN
@@ -444,6 +453,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
 
       ! Calculates total energy
       E = E1 + E2 + En + Exc
+
       call g2g_timer_sum_pause('Fock integrals')
 
 
@@ -625,8 +635,56 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
 
       call g2g_timer_stop('Total iter')
       call g2g_timer_sum_pause('Iteration')
-999 continue
 
+      !-----------------------------------------------------------------------!
+      ! Prints af coefficients and energy componnents
+      if (first_call) then
+        Hmat_vec_checkpoint=Hmat_vec
+        Smat_checkpoint=Smat
+        Fmat_vec_checkpoint=Fmat_vec
+        En_checkpoint=En
+        call int1(En, Fmat_vec, Hmat_vec, Smat, d, r, Iz, natom, &
+                  ntatom)
+        if (nsol.gt.0.and.igpu.ge.1) then
+          call aint_qmmm_init(0,r,pc)
+          call aint_qmmm_fock(E1s,Etrash)
+          call aint_qmmm_init(nsol,r,pc)
+        endif
+        E1s=0.D0
+        do kk=1,MM
+          E1s = E1s + Pmat_vec(kk) * Hmat_vec(kk)
+        enddo
+        Es = Ens
+        Es = Es + E1 - E1s
+        open(unit = 37744083, file='af',action='write',position='append')
+        write(37744083, *) niter
+        write(37744083, *) Md
+        write(37744083, *) E1
+        write(37744083, *) E2
+        write(37744083, *) Es
+        write(37744083, *) Exc
+        do afindex=1,Md
+          write(37744083,'(F18.9)') af(afindex)
+        end do
+        write(37744083, *) "END"
+        close(unit = 37744083)
+        Hmat_vec = Hmat_vec_checkpoint
+        Smat = Smat_checkpoint
+        Fmat_vec = Fmat_vec_checkpoint
+        En = En_checkpoint
+        if (niter.eq. 1) then
+        open(unit = 37744084, file='propd',action='write',position='append')
+        do afindex=1,Md
+          write(37744084,*) Nucd(afindex), ad(afindex,1), cd(afindex,1)
+        end do
+        close(unit = 37744084)
+        endif
+
+      end if
+      !-----------------------------------------------------------------------!
+
+999 continue
+ 
    call g2g_timer_sum_start('Finalize SCF')
 
    ! Checks of convergence
@@ -654,6 +712,10 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
 
 
    if (MOD(npas,energy_freq).eq.0) then
+
+      !-----------------------------------------------------------------------!
+      !-----------------------------------------------------------------------!
+
 !       Resolve with last density to get XC energy
         call g2g_timer_sum_start('Exchange-correlation energy')
         call g2g_new_grid(igrid)
@@ -693,7 +755,6 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
 !       NucleusQM-CHarges MM
         Es = Ens
         Es = Es + E1 - E1s
-
         ! Calculates DTFD3 Grimme's corrections to energy.
         call g2g_timer_sum_start("DFTD3 Energy")
         call dftd3_energy(E_dftd, d, natom, .true.)
@@ -823,5 +884,6 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
       call g2g_timer_sum_stop('Finalize SCF')
       call g2g_timer_sum_stop('SCF')
       call g2g_timer_stop('SCF_full')
+first_call=.false.
       end subroutine SCF
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%!
