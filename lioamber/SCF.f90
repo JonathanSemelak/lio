@@ -1,5 +1,6 @@
 #include "datatypes/datatypes.fh"
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%!
+! TEST
 ! DIRECT VERSION
 ! Calls all integrals generator subroutines : 1 el integrals,
 ! 2 el integrals, exchange fitting , so it gets S matrix, F matrix
