@@ -1,6 +1,5 @@
 #include "datatypes/datatypes.fh"
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%!
-! TEST
 ! DIRECT VERSION
 ! Calls all integrals generator subroutines : 1 el integrals,
 ! 2 el integrals, exchange fitting , so it gets S matrix, F matrix
@@ -66,6 +65,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
    use dftd3, only: dftd3_energy
    use properties, only: do_lowdin
    use extern_functional_subs, only: libint_init, exact_exchange, exact_energies
+   use harris_data,   only: kinE, Tmat_vec
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%!
 
@@ -280,6 +280,17 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
       do kk=1,MM
         E1 = E1 + Pmat_vec(kk) * Hmat_vec(kk)
       enddo
+
+!-------------------------------------------------------------------------------
+! Facundo: If we want to separate the kinetic energy, we sum the elements of    
+! Tmat_vec here.                                                                
+!-------------------------------------------------------------------------------
+
+      kinE = 0.D0 
+      do kk = 1, MM
+        kinE = kinE + Pmat_vec(kk) * Tmat_vec(kk)
+      enddo
+
       call g2g_timer_sum_stop('1-e Fock')
 
 
@@ -438,6 +449,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
 
       ! Calculates 1e energy contributions (including solvent)
       E1 = 0.0D0
+      kinE = 0.D0
       if (generate_rho0) then
          ! REACTION FIELD CASE
          if (field) call field_setup_old(1.0D0, 0, fx, fy, fz)
@@ -445,10 +457,12 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
                          natom, ntatom, open, 2*NCO+NUNP, Iz, pc)
          do kk = 1, MM
             E1 = E1 + Pmat_vec(kk) * Hmat_vec(kk)
+            kinE = kinE + Pmat_vec(kk) * Tmat_vec(kk)
          enddo
       else
          do kk=1,MM
             E1 = E1 + Pmat_vec(kk) * Hmat_vec(kk)
+            kinE = kinE + Pmat_vec(kk) * Tmat_vec(kk)
          enddo
       endif
 
@@ -664,6 +678,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
         write(37744083, *) E2
         write(37744083, *) Es
         write(37744083, *) Exc
+        write(37744083, *) kinE
         do afindex=1,Md
           write(37744083,'(F18.9)') af(afindex)
         end do

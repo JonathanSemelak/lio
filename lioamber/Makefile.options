@@ -100,9 +100,12 @@ ifeq ($(intel),0)
   FC      = gfortran
   LC      = gfortran
   FFLAGS += -cpp -I$(OBJPATH) -J$(OBJPATH)
-  LFLAGS += -L/usr/lib
-  LIBS   += -lblas -llapack
-
+  #LFLAGS += -L/usr/lib
+  #LIBS   += -lblas -llapack
+  LFLAGS += -L/apps/gcc/7.3.0/lapack/3.8.0/lib
+  LIBS   += -llapack
+  LFLAGS += -L/apps/gcc/7.3.0/openblas/0.2.20/lib
+  LIBS   += -lblas
   DEBUG01 = -g -Wtabs -fcheck=all
   DEBUG02 = -g -Wall -Wextra -fcheck=all -fbacktrace -pedantic -ffpe-trap=invalid,zero,overflow,underflow
   OPTIM0P = #TODO: no flags for parallelization using gfortran?

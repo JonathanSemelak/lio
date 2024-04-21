@@ -160,6 +160,12 @@ tmplist :=
 tmplist += TD.o ceed_subs.o
 $(tmplist:%.o=$(OBJPATH)/%.o) : $(OBJPATH)/ceed_data.mod
 ################################################################################
+OBJECTS += harris_data.o
+
+tmplist :=
+tmplist += lionml_data.o SCF.o subm_int1.o fileio.o 
+$(tmplist:%.o=$(OBJPATH)/%.o) : $(OBJPATH)/harris_data.mod
+################################################################################
 include converger_subs/conver.mk
 OBJECTS += converger_data.o
 OBJECTS += converger_subs.o
@@ -538,5 +544,5 @@ OBJECTS += constants_mod.o
 #
 modusrs := subm_int1.o subm_int1G.o subm_int2.o subm_int3mem.o subm_int3lu.o dip.o
 modusrs += subm_intdip.o
-modusrs += cubegen.o basis_data.o grid.o input_read.o geometry_optim.o lj_switch.o
+modusrs += cubegen.o basis_data.o grid.o input_read.o geometry_optim.o lj_switch.o 
 $(modusrs:%.o=$(OBJPATH)/%.o) : ${OBJPATH}/constants_mod.mod
