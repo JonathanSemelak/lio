@@ -679,6 +679,7 @@ subroutine SCF(E, fock_aop, rho_aop, fock_bop, rho_bop)
         write(37744083, *) Es
         write(37744083, *) Exc
         write(37744083, *) kinE
+        write(37744083, *) En_checkpoint+E1+E2+Es+Exc
         do afindex=1,Md
           write(37744083,'(F18.9)') af(afindex)
         end do
